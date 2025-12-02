@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Super Admin Panel</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root { 
+            --w: 250px; --col1: #2c3e50; --col2: #764ba2; --red: #e74c3c; --green: #2ecc71; 
+            --pay-btn-padding: 6px 12px; /* Uniform Padding */
+            --pay-btn-font: 0.8rem;
+        }
+        body { margin:0; font-family:'Poppins',sans-serif; background:#f4f6f9; display:flex; height:100vh; overflow:hidden; }
+        
+        /* Sidebar & Overlay */
+        .overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:900; display:none; }
+        .overlay.show { display:block; }
+        
+        .sidebar { width:var(--w); background:var(--col1); color:#fff; height:100%; position:fixed; z-index:1000; transition:0.3s; display:flex; flex-direction:column; }
+        .brand { padding:20px; font-size:1.4rem; font-weight:bold; border-bottom:1px solid rgba(255,255,255,0.1); display:flex; justify-content:space-between; align-items:center; }
+        .close-btn { display:none; cursor:pointer; }
+        
+        .menu { list-style:none; padding:20px 0; margin:0; }
+        .menu li { padding:15px 25px; cursor:pointer; border-left:4px solid transparent; transition:0.2s; }
+        .menu li:hover, .menu li.active { background:rgba(255,255,255,0.05); border-left-color:var(--col2); }
+        .menu i { width:30px; }
+
+        /* Content */
+        .main { flex:1; margin-left:var(--w); display:flex; flex-direction:column; transition:0.3s; width:100%; }
+        .top { background:#fff; padding:15px 20px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 2px 5px rgba(0,0,0,0.05); }
+        .ham { font-size:1.4rem; cursor:pointer; display:none; }
+        
+        .content { padding:20px; overflow-y:auto; flex:1; }
+        .page { display:none; animation:fade 0.3s; }
+        .page.active { display:block; }
+        @keyframes fade { from{opacity:0} to{opacity:1} }
+
+        /* Widgets */
+        .cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:20px; margin-bottom:20px; }
+        .box { background:#fff; padding:20px; border-radius:10px; box-shadow:0 2px 5px rgba(0,0,0,0.05); display:flex; justify-content:space-between; align-items:center; }
+        .box h3 { margin:0; font-size:1.8rem; color:var(--col2); }
+        
+        /* Forms & Tables */
+        .panel { background:#fff; padding:25px; border-radius:10px; box-shadow:0 2px 5px rgba(0,0,0,0.05); margin-bottom:20px; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .inp, .sel { width:100%; padding:10px; margin:5px 0 15px; border:1px solid #ddd; border-radius:5px; box-sizing:border-box; font-family: inherit; }
+        .btn { background:var(--col2); color:#fff; border:none; padding:10px 20px; border-radius:5px; cursor:pointer; transition:0.2s; }
+        .btn:hover { opacity: 0.9; }
+        .btn-del { background: var(--red); padding: 5px 10px; font-size: 0.8rem; }
+        .btn-toggle { background: var(--green); padding: 5px 10px; font-size: 0.8rem; }
+        
+        .table-wrap { overflow-x:auto; }
+        table { width:100%; border-collapse:collapse; min-width:700px; } 
+        th, td { padding:12px; border-bottom:1px solid #eee; text-align:left; vertical-align: middle; }
+        .badge { padding:4px 8px; border-radius:10px; color:#fff; font-size:0.75rem; text-transform: capitalize; }
+        .b-pending { background:orange; } .b-paid { background:var(--green); } .b-rejected { background:var(--red); }
+        .b-banned { background:var(--red); } .b-active { background:var(--green); }
+
+        /* Account Number & Copy Button Styling */
+        .acc-group { display: flex; align-items: center; gap: 5px; }
+        .acc-num { font-weight:bold; color:#2c3e50; background:#f0f0f0; padding:4px 8px; border-radius:4px; font-size: 0.9rem; }
+        .btn-copy-num { 
+            background: #aaa; color: #fff; border: none; padding: 4px 8px; 
+            border-radius: 4px; cursor: pointer; font-size: 0.7rem; 
+            transition: background 0.2s;
+        }
+        .btn-copy-num:hover { background: #764ba2; }
+        .btn-copy-num.copied { background: var(--green); }
+
+        /* Action Buttons Spacing */
+        .action-btns .btn {
+            margin-right: 10px; /* Right margin for separation */
+            padding: var(--pay-btn-padding);
+            font-size: var(--pay-btn-font);
+        }
+        .action-btns .btn:last-child {
+            margin-right: 0;
+        }
+
+        /* --- USER DETAILS MODAL STYLES (NEW) --- */
+        .modal-backdrop-fixed {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(0, 0, 0, 0.7); z-index: 9999; 
+            display: flex; justify-content: center; align-items: center;
+            opacity: 0; visibility: hidden; transition: opacity 0.3s;
+        }
+        .modal-backdrop-fixed.show { opacity: 1; visibility: visible; }
+        
+        .detail-content {
+            background: #fff; padding: 30px; border-radius: 10px; 
+            width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            position: relative;
+        }
+        .detail-content h2 { margin-top: 0; padding-bottom: 10px; border-bottom: 1px solid #eee; }
+        
+        .user-info-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;
+        }
+        .user-info-grid .field-label { font-weight: 600; color: #555; font-size: 0.9rem; }
+        .user-info-grid .field-value { font-size: 1rem; }
+        
+        /* Search Box Styling */
+        .search-box {
+            display: flex; gap: 10px; margin-bottom: 20px;
+        }
+        .search-box .inp { margin-bottom: 0; }
+        /* --- END USER DETAILS MODAL STYLES --- */
+
+        @media(max-width:768px) {
+            .sidebar { transform:translate(-100%); }
+            .sidebar.show { transform:translate(0); }
+            .main { margin-left:0; }
+            .ham, .close-btn { display:block; }
+            .form-grid { grid-template-columns: 1fr; }
+            .user-info-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="overlay" id="overlay" onclick="toggleMenu()"></div>
+    
+    <!-- User Details Modal (NEW) -->
+    <div id="userDetailsModal" class="modal-backdrop-fixed">
+        <div class="detail-content">
+            <i class="fas fa-times" style="position: absolute; top: 15px; right: 15px; cursor: pointer; font-size: 1.2rem; color: #aaa;" onclick="hideUserDetailsModal()"></i>
+            <h2 id="modalTitle">User Details: <span id="modalUid"></span></h2>
+            
+            <input type="hidden" id="modalUserId">
+
+            <div class="user-info-grid">
+                <div>
+                    <label class="field-label">Username (Editable)</label>
+                    <input type="text" id="modalUsername" class="inp">
+                </div>
+                <div>
+                    <label class="field-label">Balance (Editable)</label>
+                    <input type="number" id="modalBalance" class="inp">
+                </div>
+                <div>
+                    <label class="field-label">Account Status</label>
+                    <span id="modalStatusBadge" class="badge"></span>
+                </div>
+                <div>
+                    <label class="field-label">Action</label>
+                    <button id="modalBanBtn" class="btn btn-del" onclick="toggleBanStatus()"><i class="fas fa-gavel"></i> Ban</button>
+                </div>
+            </div>
+            
+            <h3 style="margin-top: 30px; font-size: 1.1rem;">Other Data</h3>
+            <div id="modalOtherDetails" style="background:#f4f6f8; padding: 15px; border-radius: 8px; font-size: 0.9rem; line-height: 1.8;">
+                <!-- Detailed data will be injected here -->
+            </div>
+
+            <button class="btn" style="margin-top: 20px; width: 100%;" onclick="saveUserChanges()"><i class="fas fa-save"></i> Save Changes</button>
+        </div>
+    </div>
+    <!-- End User Details Modal -->
+
+    <div class="sidebar" id="sidebar">
+        <div class="brand">
+            <span>AdminPanel</span>
+            <i class="fas fa-times close-btn" onclick="toggleMenu()"></i>
+        </div>
+        <ul class="menu">
+            <li class="active" onclick="nav('dash',this)"><i class="fas fa-home"></i> Dashboard</li>
+            <li onclick="nav('mng_tasks',this)"><i class="fas fa-list-check"></i> Manage Tasks</li>
+            <li onclick="nav('conf',this)"><i class="fas fa-cogs"></i> Settings</li>
+            <li onclick="nav('users',this)"><i class="fas fa-users"></i> Users</li>
+            <li onclick="nav('pay',this)"><i class="fas fa-wallet"></i> Withdraws</li>
+        </ul>
+    </div>
+
+    <div class="main">
+        <div class="top">
+            <i class="fas fa-bars ham" onclick="toggleMenu()"></i>
+            <h3>Control Panel</h3>
+            <div>Admin</div>
+        </div>
+
+        <div class="content">
+            
+            <!-- Dashboard -->
+            <div id="dash" class="page active">
+                <h2>Overview</h2>
+                <div class="cards">
+                    <div class="box"><div><h3 id="uCount">0</h3><p>Users</p></div><i class="fas fa-users fa-2x" style="opacity:0.2"></i></div>
+                    <div class="box"><div><h3 id="pCount">0</h3><p>Pending Pay</p></div><i class="fas fa-clock fa-2x" style="opacity:0.2"></i></div>
+                    <div class="box"><div><h3 id="tCount">0</h3><p>Active Tasks</p></div><i class="fas fa-tasks fa-2x" style="opacity:0.2"></i></div>
+                </div>
+            </div>
+
+            <!-- Manage Tasks -->
+            <div id="mng_tasks" class="page">
+                <h2>Create New Mission</h2>
+                <div class="panel">
+                    <div class="form-grid">
+                        <div>
+                            <label>Task Title</label>
+                            <input type="text" id="tTitle" class="inp" placeholder="e.g. Join Telegram Channel">
+                        </div>
+                        <div>
+                            <label>Link / URL</label>
+                            <input type="text" id="tLink" class="inp" placeholder="https://t.me/...">
+                        </div>
+                        <div>
+                            <label>Reward (Coins)</label>
+                            <input type="number" id="tReward" class="inp" placeholder="100">
+                        </div>
+                        <div>
+                            <label>Icon Type</label>
+                            <select id="tType" class="sel">
+                                <option value="telegram">Telegram</option>
+                                <option value="youtube">YouTube</option>
+                                <option value="web">Website / Other</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button class="btn" onclick="addTask()">Add Task</button>
+                </div>
+
+                <h2>Current Tasks List</h2>
+                <div class="panel">
+                    <div class="table-wrap">
+                        <table>
+                            <thead><tr><th>Title</th><th>Reward</th><th>Type</th><th>Status</th><th>Action</th></tr></thead>
+                            <tbody id="tbTasks"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings (UPDATED) -->
+            <div id="conf" class="page">
+                <h2>App Settings</h2>
+                
+                <!-- 1. CORE EARNING & AD SETTINGS PANEL -->
+                <div class="panel">
+                    <h3>1. Core Earnings</h3>
+                    <label>Daily Ad Limit</label>
+                    <input type="number" id="sDaily" class="inp">
+                    
+                    <label>Reward Per Ad</label>
+                    <input type="number" id="sReward" class="inp">
+                    
+                    <label>Daily Check-in Reward</label>
+                    <input type="number" id="sDailyRewardAmount" class="inp">
+                    
+                    <label>Monetag Ad Function Name</label>
+                    <input type="text" id="sAdCode" class="inp" placeholder="e.g. show_10261645">
+
+                    <button class="btn" onclick="saveCoreSettings()">Save Core Settings</button>
+                </div>
+
+                <!-- 2. INVITE/REFERRAL SETTINGS -->
+                <div class="panel">
+                    <h3>2. Invite/Referral</h3>
+                    
+                    <label>Referral Bonus (Coins)</label> 
+                    <input type="number" id="sRefBonus" class="inp" placeholder="100">
+                    
+                    <label>Referral Card Title</label>
+                    <input type="text" id="sRefTitle" class="inp" placeholder="Refer & Earn">
+
+                    <label>Referral Card Description</label>
+                    <input type="text" id="sRefDesc" class="inp" placeholder="Share link & get bonus!">
+
+                    <button class="btn" onclick="saveReferralSettings()">Save Invite Settings</button>
+                </div>
+
+                <!-- 3. WITHDRAWAL FUNCTIONAL & REQUIREMENTS -->
+                <div class="panel">
+                    <h3>3. Withdrawal Functional & Requirements</h3>
+                    
+                    <label>Withdrawal Card Title</label>
+                    <input type="text" id="sWithdrawTitle" class="inp" placeholder="Withdraw Funds">
+                    
+                    <label>Withdrawal Description</label>
+                    <input type="text" id="sWithdrawDesc" class="inp" placeholder="Min Withdraw {{min_withdraw}} coins.">
+                    <small style="color:#777; display:block; margin-top:-10px; margin-bottom:15px;">Use <code>{{min_withdraw}}</code> as a placeholder.</small>
+
+                    <label>Minimum Withdraw Amount (Coins)</label>
+                    <input type="number" id="sMin" class="inp">
+                    
+                    <!-- MODIFIED: "Withdrawal Requirements (Min)" HEADING REMOVED -->
+
+                    <label>Min. Total Ads View for Withdraw</label>
+                    <input type="number" id="sMinAds" class="inp" placeholder="0">
+
+                    <label>Min. Referrals for Withdraw</label>
+                    <input type="number" id="sMinRefs" class="inp" placeholder="0">
+
+                    <label>Payment Methods (Comma Separated)</label>
+                    <input type="text" id="sPayMethods" class="inp" placeholder="bKash,Nagad,Rocket,Binance">
+                    
+                    <label>Request Withdraw Button Text</label>
+                    <input type="text" id="sRequestWithdrawBtn" class="inp" placeholder="Request Withdraw">
+
+                    <button class="btn" onclick="saveWithdrawalSettings()">Save Withdrawal Settings</button>
+                </div>
+                
+                <!-- NEW SECTION: HOME/PAGE TITLES -->
+                <div class="panel">
+                    <h3>4. Home/Page Titles</h3>
+                    
+                    <label>Home Section Title</label>
+                    <input type="text" id="sHomeSectionTitle" class="inp" placeholder="Daily Task">
+                    <small style="color:#777; display:block; margin-top:-10px; margin-bottom:15px;">The Main Title on the Home Screen.</small>
+
+                    <label>Missions Section Title</label>
+                    <input type="text" id="sMissionsSectionTitle" class="inp" placeholder="Social Missions">
+                    <small style="color:#777; display:block; margin-top:-10px; margin-bottom:15px;">The Header above all the social tasks.</small>
+
+                    <label>Invite Section Title</label>
+                    <input type="text" id="sInviteSectionTitle" class="inp" placeholder="Invite Friends">
+                    <small style="color:#777; display:block; margin-top:-10px; margin-bottom:15px;">The Title on the Invite Page.</small>
+
+                    <label>Wallet Section Title</label>
+                    <input type="text" id="sWalletSectionTitle" class="inp" placeholder="My Wallet">
+                    <small style="color:#777; display:block; margin-top:-10px; margin-bottom:15px;">The Title on the Wallet Page.</small>
+
+                    <button class="btn" onclick="savePageTitles()">Save Page Titles</button>
+                </div>
+                <!-- END NEW SECTION -->
+
+                <!-- 5. POPUP BUTTON TEXTS (RENUMBERED) -->
+                <div class="panel">
+                    <h3>5. Popup Button Texts</h3>
+                    
+                    <div style="border: 1px dashed #eee; padding: 10px; margin-bottom: 15px;">
+                        <h4>Modal Button (OK/Claim)</h4>
+                        <label>Success Modal Button Text (Ad/Daily/Mission)</label>
+                        <input type="text" id="sModalClaimBtn" class="inp" placeholder="OK, Great!">
+                        <button class="btn" onclick="saveModalClaimButtonText()">Save OK/Claim Button</button>
+                    </div>
+
+                    <div style="border: 1px dashed #eee; padding: 10px; margin-bottom: 15px;">
+                        <h4>General Error Close Button</h4>
+                        <label>Error/Close Modal Button Text (General)</label>
+                        <input type="text" id="sErrorModalBtn" class="inp" placeholder="Close">
+                        <button class="btn" onclick="saveErrorCloseButtonText()">Save Close Button</button>
+                    </div>
+
+                    <div style="border: 1px dashed #eee; padding: 10px;">
+                        <h4>Withdraw Success Button</h4>
+                        <label>Withdraw Success Button Text</label>
+                        <input type="text" id="sWithdrawSuccessBtn" class="inp" placeholder="Done">
+                        <button class="btn" onclick="saveWithdrawSuccessButtonText()">Save Withdraw Success Button</button>
+                    </div>
+                </div>
+                
+                <!-- 6. AD REWARD POPUP TEXTS (RENUMBERED) -->
+                <div class="panel">
+                    <h3>6. Ad Reward Popup Texts</h3>
+                    <label>Title</label>
+                    <input type="text" id="sAdTitle" class="inp" placeholder="Congratulations!">
+                    <label>Description</label>
+                    <input type="text" id="sAdDesc" class="inp" placeholder="You have successfully earned your reward.">
+                    <button class="btn" onclick="saveAdPopupTexts()">Save Ad Popup</button>
+                </div>
+                
+                <!-- 7. DAILY CHECK-IN POPUP TEXTS (RENUMBERED) -->
+                <div class="panel">
+                    <h3>7. Daily Check-in Popup Texts</h3>
+                    <label>Title</label>
+                    <input type="text" id="sDailyTitle" class="inp" placeholder="Daily Bonus!">
+                    <label>Description</label>
+                    <input type="text" id="sDailyDesc" class="inp" placeholder="Your check-in bonus has been added.">
+                    <button class="btn" onclick="saveDailyPopupTexts()">Save Daily Popup</button>
+                </div>
+
+                <!-- 8. MISSION REWARD POPUP TEXTS (RENUMBERED) -->
+                <div class="panel">
+                    <h3>8. Mission Reward Popup Texts</h3>
+                    <label>Title</label>
+                    <input type="text" id="sMissionTitle" class="inp" placeholder="Mission Complete!">
+                    <label>Description</label>
+                    <input type="text" id="sMissionDesc" class="inp" placeholder="The mission reward is now yours.">
+                    <button class="btn" onclick="saveMissionPopupTexts()">Save Mission Popup</button>
+                </div>
+                
+                <!-- 9. WITHDRAW SUCCESS POPUP TEXTS (RENUMBERED) -->
+                <div class="panel">
+                    <h3>9. Withdraw Success Popup Text</h3>
+                    <label>Title</label>
+                    <input type="text" id="sWithdrawSuccessTitle" class="inp" placeholder="Withdrawal Successful!">
+                    <label>Description</label>
+                    <input type="text" id="sWithdrawSuccessDesc" class="inp" placeholder="Your request has been submitted.">
+                    <button class="btn" onclick="saveWithdrawSuccessTexts()">Save Success Popup Texts</button>
+                </div>
+
+                <!-- 10. MIN AMOUNT ERROR POPUP TEXTS (RENUMBERED) -->
+                <div class="panel">
+                    <h3>10. Min Amount Error Popup</h3>
+                    <label>Title</label>
+                    <input type="text" id="sMinAmtErrTitle" class="inp" placeholder="Minimum Withdraw Error">
+                    <label>Description</label>
+                    <input type="text" id="sMinAmtErrDesc" class="inp" placeholder="Min withdraw is {{min_withdraw}} coins.">
+                    <button class="btn" onclick="saveMinAmountErrorTexts()">Save Min Error Popup</button>
+                </div>
+                
+                <!-- 11. MIN ADS VIEW ERROR POPUP TEXTS (RENUMBERED) -->
+                <div class="panel">
+                    <h3>11. Min Ads View Error Popup</h3>
+                    <label>Title</label>
+                    <input type="text" id="sMinAdsErrTitle" class="inp" placeholder="Ad View Required">
+                    <label>Description</label>
+                    <input type="text" id="sMinAdsErrDesc" class="inp" placeholder="You must view at least {{min_ads_view}} ads to withdraw.">
+                    <small style="color:#777; display:block; margin-top:-10px; margin-bottom:15px;">Use <code>{{min_ads_view}}</code> as a placeholder.</small>
+                    <button class="btn" onclick="saveMinAdsErrorTexts()">Save Min Ads Error Popup</button>
+                </div>
+                
+                <!-- 12. MIN REFERRALS ERROR POPUP TEXTS (RENUMBERED) -->
+                <div class="panel">
+                    <h3>12. Min Referrals Error Popup</h3>
+                    <label>Title</label>
+                    <input type="text" id="sMinRefsErrTitle" class="inp" placeholder="Referral Required">
+                    <label>Description</label>
+                    <input type="text" id="sMinRefsErrDesc" class="inp" placeholder="You must refer at least {{min_referrals}} users to withdraw.">
+                    <small style="color:#777; display:block; margin-top:-10px; margin-bottom:15px;">Use <code>{{min_referrals}}</code> as a placeholder.</small>
+                    <button class="btn" onclick="saveMinReferralErrorTexts()">Save Min Referrals Error Popup</button>
+                </div>
+
+                <!-- 13. BALANCE ERROR POPUP TEXTS (RENUMBERED) -->
+                <div class="panel">
+                    <h3>13. Insufficient Balance Error</h3>
+                    <label>Title</label>
+                    <input type="text" id="sBalErrTitle" class="inp" placeholder="Balance Error">
+                    <label>Description</label>
+                    <input type="text" id="sBalErrDesc" class="inp" placeholder="Insufficient Balance.">
+                    <button class="btn" onclick="saveBalanceErrorTexts()">Save Balance Error Popup</button>
+                </div>
+                
+                <!-- 14. METHOD SELECT ERROR POPUP TEXTS (RENUMBERED) -->
+                <div class="panel">
+                    <h3>14. Method Select Error</h3>
+                    <label>Title</label>
+                    <input type="text" id="sMethodErrTitle" class="inp" placeholder="Method Error">
+                    <label>Description</label>
+                    <input type="text" id="sMethodErrDesc" class="inp" placeholder="Please select a Payment Method.">
+                    <button class="btn" onclick="saveMethodErrorTexts()">Save Method Error Popup</button>
+                </div>
+
+                <!-- 15. ACCOUNT NUMBER ERROR POPUP TEXTS (RENUMBERED) -->
+                <div class="panel">
+                    <h3>15. Account Number Error</h3>
+                    <label>Title</label>
+                    <input type="text" id="sAccNumErrTitle" class="inp" placeholder="Account Error">
+                    <label>Description</label>
+                    <input type="text" id="sAccNumErrDesc" class="inp" placeholder="Please enter your Account Number.">
+                    <button class="btn" onclick="saveAccNumErrorTexts()">Save Account Error Popup</button>
+                </div>
+
+                <!-- 16. AD CARD TEXTS (RENUMBERED) -->
+                <div class="panel">
+                    <h3>16. Ad Card Texts (Daily Task)</h3>
+                    
+                    <label>Ad Card Title</label>
+                    <input type="text" id="sAdCardTitle" class="inp" placeholder="Watch Video Ads">
+
+                    <label>Ad Card Description</label>
+                    <input type="text" id="sAdCardDesc" class="inp" placeholder="Earn +{{reward_per_ad}} Coins per ad">
+                    <small style="color:#777; display:block; margin-top:-10px; margin-bottom:15px;">Use <code>{{reward_per_ad}}</code> as a placeholder for the reward amount.</small>
+
+                    <label>Watch Ad Button Text</label>
+                    <input type="text" id="sAdBtnText" class="inp" placeholder="Watch Ad Now">
+
+                    <button class="btn" onclick="saveAdCardTexts()">Save Ad Card Texts</button>
+                </div>
+                <!-- END NEW PANEL -->
+                
+            </div>
+            <!-- END SETTINGS -->
+
+            <!-- Users (MODIFIED) -->
+            <div id="users" class="page">
+                <h2>All Users</h2>
+                <div class="panel">
+                    <div class="search-box">
+                        <input type="text" id="userSearch" class="inp" placeholder="Search by User ID (UID)">
+                        <button class="btn" onclick="searchUser()"><i class="fas fa-search"></i> Search</button>
+                        <button class="btn" style="background: #aaa;" onclick="fetchUsers()"><i class="fas fa-undo"></i> Reset</button>
+                    </div>
+                    
+                    <div class="table-wrap">
+                        <table>
+                            <thead><tr><th>UID</th><th>Username</th><th>Balance</th><th>Status</th><th>Action</th></tr></thead>
+                            <tbody id="tbUser"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Withdraws -->
+            <div id="pay" class="page">
+                <h2>Withdraw Requests</h2>
+                <div class="panel">
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>User Info</th>
+                                    <th>Method</th>
+                                    <th>Account No</th> 
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbPay"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+
+    <script>
+        // CONFIG
+        const firebaseConfig = {
+            apiKey: "AIzaSyAXBG5RZJ2b38kknNKzmygXrzOoCTugLIE",
+            authDomain: "new-tg-test.firebaseapp.com",
+            projectId: "new-tg-test",
+            storageBucket: "new-tg-test.firebasestorage.app",
+            messagingSenderId: "1077123386154",
+            appId: "1:1077123386154:web:dbbc89d5874127f60c6c53"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        // UI LOGIC 
+        function toggleMenu() {
+            document.getElementById('sidebar').classList.toggle('show');
+            document.getElementById('overlay').classList.toggle('show');
+        }
+
+        // MODIFIED NAV FUNCTION
+        function nav(id, el) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            document.querySelectorAll('.menu li').forEach(l => l.classList.remove('active'));
+            el.classList.add('active');
+
+            if (id === 'users') {
+                fetchUsers(); 
+            }
+
+            if(window.innerWidth<=768) toggleMenu();
+        }
+        // END MODIFIED NAV FUNCTION
+
+        // --- FIREBASE LOGIC ---
+
+        // 1. DASHBOARD
+        db.collection('users').onSnapshot(snap => document.getElementById('uCount').innerText = snap.size);
+        
+        // 2. TASK MANAGER (unchanged)
+        function addTask() {
+            const title = document.getElementById('tTitle').value;
+            const link = document.getElementById('tLink').value;
+            const reward = parseInt(document.getElementById('tReward').value);
+            const type = document.getElementById('tType').value;
+
+            if(!title || !link || !reward) return alert("Please fill all fields");
+
+            db.collection('tasks').add({
+                title: title,
+                link: link,
+                reward: reward,
+                type: type,
+                active: true,
+                created_at: Date.now()
+            }).then(() => {
+                alert("Task Added Successfully!");
+                document.getElementById('tTitle').value = '';
+                document.getElementById('tLink').value = '';
+                document.getElementById('tReward').value = '';
+            });
+        }
+
+        db.collection('tasks').orderBy('created_at', 'desc').onSnapshot(snap => {
+            let html = '';
+            let activeCount = 0;
+            snap.forEach(doc => {
+                const d = doc.data();
+                if(d.active) activeCount++;
+                html += `<tr>
+                    <td>${d.title}</td>
+                    <td>${d.reward}</td>
+                    <td>${d.type}</td>
+                    <td><span class="badge" style="background:${d.active?'green':'gray'}">${d.active?'Active':'Hidden'}</span></td>
+                    <td>
+                        <button class="btn btn-toggle" onclick="toggleTask('${doc.id}', ${d.active})">${d.active?'Hide':'Show'}</button>
+                        <button class="btn btn-del" onclick="delTask('${doc.id}')"><i class="fas fa-trash"></i></button>
+                    </td>
+                </tr>`;
+            });
+            document.getElementById('tbTasks').innerHTML = html;
+            document.getElementById('tCount').innerText = activeCount;
+        });
+
+        function delTask(id) { if(confirm("Delete task?")) db.collection('tasks').doc(id).delete(); }
+        function toggleTask(id, st) { db.collection('tasks').doc(id).update({ active: !st }); }
+
+        // 3. SETTINGS (Load logic combined, save functions separated)
+        const setRef = db.collection('settings').doc('global');
+        
+        // Load All Settings (UPDATED to include all new page titles, min requirements, and renumbered error texts)
+        setRef.get().then(doc => {
+            if(doc.exists) {
+                const d = doc.data();
+                
+                // 1. Core
+                document.getElementById('sDaily').value = d.daily_limit || '';
+                document.getElementById('sReward').value = d.reward_per_ad || '';
+                document.getElementById('sDailyRewardAmount').value = d.daily_reward_amount || '';
+                document.getElementById('sAdCode').value = d.monetag_ad_code || ''; 
+                
+                // 2. Invite/Referral
+                document.getElementById('sRefBonus').value = d.ref_bonus || '';
+                document.getElementById('sRefTitle').value = d.ref_title || 'Refer & Earn';
+                document.getElementById('sRefDesc').value = d.ref_desc || 'Share link & get bonus!';
+                
+                // 3. Withdrawal Functional & Requirements
+                document.getElementById('sMin').value = d.min_withdraw || ''; 
+                document.getElementById('sWithdrawTitle').value = d.withdraw_title || '';
+                document.getElementById('sWithdrawDesc').value = d.withdraw_desc || '';
+                document.getElementById('sPayMethods').value = d.pay_methods ? d.pay_methods.join(', ') : '';
+                document.getElementById('sRequestWithdrawBtn').value = d.request_withdraw_btn_text || 'Request Withdraw';
+                document.getElementById('sMinAds').value = d.min_ads_view_for_withdraw || 0; 
+                document.getElementById('sMinRefs').value = d.min_referrals_for_withdraw || 0; 
+                
+                // 4. Home/Page Titles (NEW SECTION)
+                document.getElementById('sHomeSectionTitle').value = d.home_section_title || 'Daily Task';
+                document.getElementById('sMissionsSectionTitle').value = d.missions_section_title || 'Social Missions';
+                document.getElementById('sInviteSectionTitle').value = d.invite_section_title || 'Invite Friends';
+                document.getElementById('sWalletSectionTitle').value = d.wallet_section_title || 'My Wallet';
+
+                // 5. Popup Button Texts (RENUMBERED)
+                document.getElementById('sModalClaimBtn').value = d.modal_claim_btn_text || 'OK, Great!';
+                document.getElementById('sErrorModalBtn').value = d.error_modal_btn_text || 'Close';
+                document.getElementById('sWithdrawSuccessBtn').value = d.withdraw_success_btn_text || 'Done';
+                
+                // 6-9. Reward & Success Popups (RENUMBERED)
+                document.getElementById('sAdTitle').value = d.ad_popup_title || '';
+                document.getElementById('sAdDesc').value = d.ad_popup_desc || '';
+                document.getElementById('sDailyTitle').value = d.daily_popup_title || '';
+                document.getElementById('sDailyDesc').value = d.daily_popup_desc || '';
+                document.getElementById('sMissionTitle').value = d.mission_popup_title || '';
+                document.getElementById('sMissionDesc').value = d.mission_popup_desc || '';
+                document.getElementById('sWithdrawSuccessTitle').value = d.withdraw_success_title || 'Withdrawal Successful!';
+                document.getElementById('sWithdrawSuccessDesc').value = d.withdraw_success_desc || 'Your request has been submitted.';
+                
+                // 10. Min Amount Error Popups (RENUMBERED)
+                document.getElementById('sMinAmtErrTitle').value = d.min_amt_err_title || 'Minimum Withdraw Error';
+                document.getElementById('sMinAmtErrDesc').value = d.min_amt_err_desc || 'Min withdraw is {{min_withdraw}} coins.';
+                
+                // 11. Min Ads View Error Popups (RENUMBERED)
+                document.getElementById('sMinAdsErrTitle').value = d.min_ads_err_title || 'Ad View Required';
+                document.getElementById('sMinAdsErrDesc').value = d.min_ads_err_desc || 'You must view at least {{min_ads_view}} ads to withdraw.';
+
+                // 12. Min Referrals Error Popups (RENUMBERED)
+                document.getElementById('sMinRefsErrTitle').value = d.min_refs_err_title || 'Referral Required';
+                document.getElementById('sMinRefsErrDesc').value = d.min_refs_err_desc || 'You must refer at least {{min_referrals}} users to withdraw.';
+                
+                // 13-15. Balance, Method, Account Errors (RENUMBERED)
+                document.getElementById('sBalErrTitle').value = d.bal_err_title || 'Balance Error';
+                document.getElementById('sBalErrDesc').value = d.bal_err_desc || 'Insufficient Balance.';
+                document.getElementById('sMethodErrTitle').value = d.method_err_title || 'Method Error';
+                document.getElementById('sMethodErrDesc').value = d.method_err_desc || 'Please select a Payment Method.';
+                document.getElementById('sAccNumErrTitle').value = d.acc_num_err_title || 'Account Error';
+                document.getElementById('sAccNumErrDesc').value = d.acc_num_err_desc || 'Please enter your Account Number.';
+                
+                // 16. Ad Card Texts (RENUMBERED)
+                document.getElementById('sAdCardTitle').value = d.ad_card_title || 'Watch Video Ads';
+                document.getElementById('sAdCardDesc').value = d.ad_card_desc || 'Earn +{{reward_per_ad}} Coins per ad';
+                document.getElementById('sAdBtnText').value = d.ad_btn_text || 'Watch Ad Now';
+
+            }
+        });
+
+        // --- SEPARATED SAVE FUNCTIONS ---
+        
+        // 1. Core Earnings
+        function saveCoreSettings() {
+            setRef.set({
+                daily_limit: parseInt(document.getElementById('sDaily').value),
+                reward_per_ad: parseInt(document.getElementById('sReward').value),
+                daily_reward_amount: parseInt(document.getElementById('sDailyRewardAmount').value),
+                monetag_ad_code: document.getElementById('sAdCode').value.trim()
+            }, {merge:true}).then(() => alert("Core Settings Saved!"));
+        }
+        
+        // 2. Invite/Referral
+        function saveReferralSettings() {
+             setRef.set({
+                ref_bonus: parseInt(document.getElementById('sRefBonus').value),
+                ref_title: document.getElementById('sRefTitle').value.trim(),
+                ref_desc: document.getElementById('sRefDesc').value.trim()
+            }, {merge:true}).then(() => alert("Invite Settings Saved!"));
+        }
+
+        // 3. Withdrawal Functional & Requirements
+        function saveWithdrawalSettings() {
+            const payMethodsString = document.getElementById('sPayMethods').value.trim();
+            const payMethodsArray = payMethodsString ? payMethodsString.split(',').map(m => m.trim()).filter(m => m.length > 0) : ['bKash', 'Nagad', 'Rocket', 'Binance'];
+            
+            setRef.set({
+                min_withdraw: parseInt(document.getElementById('sMin').value),
+                withdraw_title: document.getElementById('sWithdrawTitle').value.trim(),
+                withdraw_desc: document.getElementById('sWithdrawDesc').value.trim(),
+                pay_methods: payMethodsArray,
+                request_withdraw_btn_text: document.getElementById('sRequestWithdrawBtn').value.trim(),
+                
+                min_ads_view_for_withdraw: parseInt(document.getElementById('sMinAds').value),
+                min_referrals_for_withdraw: parseInt(document.getElementById('sMinRefs').value)
+
+            }, {merge:true}).then(() => alert("Withdrawal Settings Saved!"));
+        }
+        
+        // 4. Home/Page Titles (NEW FUNCTION)
+        function savePageTitles() {
+            setRef.set({
+                home_section_title: document.getElementById('sHomeSectionTitle').value.trim(),
+                missions_section_title: document.getElementById('sMissionsSectionTitle').value.trim(),
+                invite_section_title: document.getElementById('sInviteSectionTitle').value.trim(),
+                wallet_section_title: document.getElementById('sWalletSectionTitle').value.trim()
+            }, {merge:true}).then(() => alert("Page Titles Saved!"));
+        }
+        
+        // 5. Popup Button Texts (3 separate functions)
+        function saveModalClaimButtonText() {
+            setRef.set({ modal_claim_btn_text: document.getElementById('sModalClaimBtn').value.trim() }, {merge:true}).then(() => alert("OK/Claim Button Text Saved!"));
+        }
+        function saveErrorCloseButtonText() {
+            setRef.set({ error_modal_btn_text: document.getElementById('sErrorModalBtn').value.trim() }, {merge:true}).then(() => alert("Close Button Text Saved!"));
+        }
+        function saveWithdrawSuccessButtonText() {
+            setRef.set({ withdraw_success_btn_text: document.getElementById('sWithdrawSuccessBtn').value.trim() }, {merge:true}).then(() => alert("Withdraw Success Button Text Saved!"));
+        }
+
+        // 6. Ad Reward Popups
+        function saveAdPopupTexts() {
+            setRef.set({
+                ad_popup_title: document.getElementById('sAdTitle').value.trim(),
+                ad_popup_desc: document.getElementById('sAdDesc').value.trim()
+            }, {merge:true}).then(() => alert("Ad Popup Texts Saved!"));
+        }
+
+        // 7. Daily Check-in Popups
+        function saveDailyPopupTexts() {
+            setRef.set({
+                daily_popup_title: document.getElementById('sDailyTitle').value.trim(),
+                daily_popup_desc: document.getElementById('sDailyDesc').value.trim()
+            }, {merge:true}).then(() => alert("Daily Popup Texts Saved!"));
+        }
+
+        // 8. Mission Reward Popups
+        function saveMissionPopupTexts() {
+            setRef.set({
+                mission_popup_title: document.getElementById('sMissionTitle').value.trim(),
+                mission_popup_desc: document.getElementById('sMissionDesc').value.trim()
+            }, {merge:true}).then(() => alert("Mission Popup Texts Saved!"));
+        }
+
+        // 9. Withdraw Success Popups (Text only, button text is saved in a separate function)
+        function saveWithdrawSuccessTexts() {
+            setRef.set({
+                withdraw_success_title: document.getElementById('sWithdrawSuccessTitle').value.trim(),
+                withdraw_success_desc: document.getElementById('sWithdrawSuccessDesc').value.trim()
+            }, {merge:true}).then(() => alert("Withdraw Success Popup Texts Saved!"));
+        }
+
+        // 10. Min Amount Error Popups
+        function saveMinAmountErrorTexts() {
+            setRef.set({
+                min_amt_err_title: document.getElementById('sMinAmtErrTitle').value.trim(),
+                min_amt_err_desc: document.getElementById('sMinAmtErrDesc').value.trim()
+            }, {merge:true}).then(() => alert("Min Amount Error Texts Saved!"));
+        }
+        
+        // 11. Min Ads View Error Popups
+        function saveMinAdsErrorTexts() {
+            setRef.set({
+                min_ads_err_title: document.getElementById('sMinAdsErrTitle').value.trim(),
+                min_ads_err_desc: document.getElementById('sMinAdsErrDesc').value.trim()
+            }, {merge:true}).then(() => alert("Min Ads Error Texts Saved!"));
+        }
+        
+        // 12. Min Referrals Error Popups
+        function saveMinReferralErrorTexts() {
+            setRef.set({
+                min_refs_err_title: document.getElementById('sMinRefsErrTitle').value.trim(),
+                min_refs_err_desc: document.getElementById('sMinRefsErrDesc').value.trim()
+            }, {merge:true}).then(() => alert("Min Referrals Error Texts Saved!"));
+        }
+
+        // 13. Balance Error Popups
+        function saveBalanceErrorTexts() {
+            setRef.set({
+                bal_err_title: document.getElementById('sBalErrTitle').value.trim(),
+                bal_err_desc: document.getElementById('sBalErrDesc').value.trim()
+            }, {merge:true}).then(() => alert("Balance Error Texts Saved!"));
+        }
+        
+        // 14. Method Select Error Popups
+        function saveMethodErrorTexts() {
+            setRef.set({
+                method_err_title: document.getElementById('sMethodErrTitle').value.trim(),
+                method_err_desc: document.getElementById('sMethodErrDesc').value.trim()
+            }, {merge:true}).then(() => alert("Method Error Texts Saved!"));
+        }
+
+        // 15. Account Number Error Popups
+        function saveAccNumErrorTexts() {
+            setRef.set({
+                acc_num_err_title: document.getElementById('sAccNumErrTitle').value.trim(),
+                acc_num_err_desc: document.getElementById('sAccNumErrDesc').value.trim()
+            }, {merge:true}).then(() => alert("Account Error Texts Saved!"));
+        }
+        
+        // 16. Ad Card Texts (MODIFIED NAME)
+        function saveAdCardTexts() {
+            setRef.set({
+                ad_card_title: document.getElementById('sAdCardTitle').value.trim(),
+                ad_card_desc: document.getElementById('sAdCardDesc').value.trim(),
+                ad_btn_text: document.getElementById('sAdBtnText').value.trim()
+            }, {merge:true}).then(() => alert("Ad Card Texts Saved!"));
+        }
+        
+        // --- USERS & WITHDRAWALS LOGIC (UNCHANGED) ---
+        
+        function fetchUsers(uid = null) {
+            const tbUser = document.getElementById('tbUser');
+            tbUser.innerHTML = `<tr><td colspan="5" style="text-align:center;"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>`;
+
+            let query = db.collection('users').orderBy('created_at', 'desc');
+
+            if (uid) {
+                query = db.collection('users').doc(uid);
+                query.get().then(doc => {
+                    if (doc.exists) {
+                        renderUserTable([doc]);
+                    } else {
+                        tbUser.innerHTML = `<tr><td colspan="5" style="text-align:center;">No user found with UID: ${uid}</td></tr>`;
+                    }
+                }).catch(err => {
+                    console.error(err);
+                    tbUser.innerHTML = `<tr><td colspan="5" style="text-align:center; color: var(--red);">Error fetching user.</td></tr>`;
+                });
+            } else {
+                query.limit(50).onSnapshot(snap => {
+                    renderUserTable(snap.docs);
+                });
+            }
+        }
+        
+        function renderUserTable(docs) {
+            let html = '';
+            const tbUser = document.getElementById('tbUser');
+            if (docs.length === 0) {
+                 tbUser.innerHTML = `<tr><td colspan="5" style="text-align:center;">No users found.</td></tr>`;
+                 return;
+            }
+
+            docs.forEach(doc => {
+                const d = doc.data();
+                const status = d.is_banned ? 'banned' : 'active';
+                const statusText = d.is_banned ? 'Banned' : 'Active';
+
+                html += `<tr>
+                    <td>${doc.id}</td>
+                    <td>${d.username || 'N/A'}</td>
+                    <td>${d.balance || 0}</td>
+                    <td><span class="badge b-${status}">${statusText}</span></td>
+                    <td>
+                        <button class="btn" style="background:var(--col2); padding: 5px 10px; font-size: 0.8rem;" onclick="showUserDetails('${doc.id}')">
+                            <i class="fas fa-eye"></i> Details
+                        </button>
+                    </td>
+                </tr>`;
+            });
+            tbUser.innerHTML = html;
+        }
+
+        function searchUser() {
+            const searchId = document.getElementById('userSearch').value.trim();
+            if (searchId) {
+                fetchUsers(searchId);
+            } else {
+                alert("Please enter a User ID to search.");
+            }
+        }
+
+        // USER DETAILS MODAL FUNCTIONS
+        function showUserDetailsModal() {
+            document.getElementById('userDetailsModal').classList.add('show');
+        }
+
+        function hideUserDetailsModal() {
+            document.getElementById('userDetailsModal').classList.remove('show');
+        }
+
+        function showUserDetails(uid) {
+            db.collection('users').doc(uid).get().then(doc => {
+                if (doc.exists) {
+                    const d = doc.data();
+                    const status = d.is_banned ? 'banned' : 'active';
+                    const statusText = d.is_banned ? 'Banned' : 'Active';
+                    const banButton = document.getElementById('modalBanBtn');
+                    
+                    document.getElementById('modalUserId').value = uid;
+                    document.getElementById('modalUid').innerText = uid;
+                    document.getElementById('modalUsername').value = d.username || '';
+                    document.getElementById('modalBalance').value = d.balance || 0;
+                    document.getElementById('modalStatusBadge').innerText = statusText;
+                    document.getElementById('modalStatusBadge').className = `badge b-${status}`;
+
+                    if (d.is_banned) {
+                        banButton.innerHTML = '<i class="fas fa-check"></i> Unban User';
+                        banButton.style.backgroundColor = 'var(--green)';
+                    } else {
+                        banButton.innerHTML = '<i class="fas fa-gavel"></i> Ban User';
+                        banButton.style.backgroundColor = 'var(--red)';
+                    }
+
+                    let otherHtml = `
+                        <strong>Full Details:</strong><br>
+                        - Ads Watched (Daily): ${d.ads_watched || 0}<br>
+                        - Ads Watched (Total): ${d.total_ads_watched || 0}<br>
+                        - Referral Count: ${d.referral_count || 0}<br>
+                        - Earned from Ref: ${d.referral_earnings || 0}<br>
+                        - Referred By: ${d.referred_by || 'N/A'}<br>
+                        - Last Ad Date: ${d.last_ad_date || 'N/A'}<br>
+                        - Last Daily Claim: ${d.last_daily_claim_date || 'N/A'}<br>
+                        - Created At: ${d.created_at ? new Date(d.created_at.toMillis()).toLocaleDateString() : 'N/A'}
+                    `;
+                    document.getElementById('modalOtherDetails').innerHTML = otherHtml;
+
+                    showUserDetailsModal();
+                } else {
+                    alert("User not found!");
+                }
+            }).catch(err => {
+                console.error("Error fetching user details:", err);
+                alert("Error fetching user details.");
+            });
+        }
+
+        function toggleBanStatus() {
+            const uid = document.getElementById('modalUserId').value;
+            const currentStatus = document.getElementById('modalStatusBadge').innerText === 'Banned';
+            const newStatus = !currentStatus;
+            
+            if (confirm(`Are you sure you want to ${newStatus ? 'BAN' : 'UNBAN'} user ${uid}?`)) {
+                db.collection('users').doc(uid).update({ is_banned: newStatus }).then(() => {
+                    alert(`User ${uid} successfully ${newStatus ? 'BANNED' : 'UNBANNED'}.`);
+                    hideUserDetailsModal();
+                    fetchUsers(); 
+                }).catch(err => {
+                    console.error("Error toggling ban status:", err);
+                    alert("Failed to update ban status.");
+                });
+            }
+        }
+
+        function saveUserChanges() {
+            const uid = document.getElementById('modalUserId').value;
+            const newUsername = document.getElementById('modalUsername').value.trim();
+            const newBalance = parseInt(document.getElementById('modalBalance').value);
+
+            if (!uid) return;
+
+            if (isNaN(newBalance) || newBalance < 0) {
+                return alert("Please enter a valid balance amount.");
+            }
+
+            if (confirm(`Are you sure you want to save changes for user ${uid}?`)) {
+                db.collection('users').doc(uid).update({
+                    username: newUsername,
+                    balance: newBalance
+                }).then(() => {
+                    alert("User details updated successfully!");
+                    hideUserDetailsModal();
+                    fetchUsers(); 
+                }).catch(err => {
+                    console.error("Error saving user details:", err);
+                    alert("Failed to save changes.");
+                });
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', fetchUsers);
+
+
+        // 5. WITHDRAWALS
+        db.collection('withdrawals').onSnapshot(snap => {
+            let list = [];
+            snap.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
+            
+            document.getElementById('pCount').innerText = list.filter(x => x.status === 'pending').length;
+
+            list.sort((a,b) => b.date - a.date);
+
+            let html = '';
+            list.forEach(item => {
+                const btns = `
+                    <div class="action-btns">
+                        <button class="btn" style="background:green; padding:var(--pay-btn-padding); font-size:var(--pay-btn-font);" onclick="ups('${item.id}','paid')">
+                            <i class="fas fa-check"></i> Paid
+                        </button> 
+                        <button class="btn" style="background:red; padding:var(--pay-btn-padding); font-size:var(--pay-btn-font);" onclick="ups('${item.id}','rejected')">
+                            <i class="fas fa-times"></i> Reject
+                        </button>
+                    </div>`;
+
+                const displayName = item.username ? item.username : 'User';
+                const accountNumber = item.account_number || 'N/A';
+
+                html += `<tr>
+                    <td>
+                        <strong>${displayName}</strong><br>
+                        <small style="color:#777; font-size:0.7rem;">${item.user_id || item.uid}</small>
+                    </td>
+                    <td>${item.method}</td>
+                    <td>
+                        <div class="acc-group">
+                            <span class="acc-num" id="accNum-${item.id}">${accountNumber}</span>
+                            <button class="btn-copy-num" onclick="copyAccountNum('${item.id}', this)" title="Copy Number">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                    </td>
+                    <td style="color: green; font-weight:bold;">${item.amount}</td>
+                    <td><span class="badge b-${item.status}">${item.status}</span></td>
+                    <td>${btns}</td>
+                </tr>`;
+            });
+            document.getElementById('tbPay').innerHTML = html;
+        });
+
+        function ups(id, st) {
+            db.collection('withdrawals').doc(id).update({ status: st });
+        }
+
+        function copyAccountNum(id, btn) {
+            const num = document.getElementById(`accNum-${id}`).innerText;
+            if(num === 'N/A') return;
+            
+            navigator.clipboard.writeText(num).then(() => {
+                const oldHtml = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-check"></i>';
+                btn.classList.add('copied');
+                
+                setTimeout(() => {
+                    btn.innerHTML = oldHtml;
+                    btn.classList.remove('copied');
+                }, 1000);
+            }).catch(err => {
+                alert('Copy failed: ' + err);
+            });
+        }
+
+    </script>
+</body>
+</html>
